@@ -7,18 +7,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  email String  @unique
-  id    Int     @id @default(autoincrement())
-  name  String?
-  posts Post[]
+model Collection {
+  address  String    @id @unique
+  name     String
+  listings Listing[]
 }
 
-model Post {
-  authorId  Int?
-  content   String?
-  id        Int     @id @default(autoincrement())
-  published Boolean @default(false)
-  title     String
-  author    User?   @relation(fields: [authorId], references: [id])
+model Listing {
+  tokenId           Int         @id
+  collectionAddress String
+  Collection        Collection? @relation(fields: [collectionAddress], references: [address])
 }

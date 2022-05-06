@@ -1,148 +1,108 @@
 const express = require('express')
 const bodyParser = require('body-parser')
+const puppeteer = require('puppeteer-extra')
 const { PrismaClient } = require('@prisma/client')
-
-const prisma = new PrismaClient()
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 const app = express()
+const prisma = new PrismaClient()
 
+puppeteer.use(StealthPlugin())
 app.use(bodyParser.json())
-app.use(express.static('public'))
 
-app.get(`/api`, async (req, res) => {
+// function isPageBottom() {
+//   if (
+//     window.innerHeight + Math.ceil(window.scrollY) >=
+//     document.body.offsetHeight
+//   ) {
+//     return true
+//   }
+//   return false
+// }
+
+// function sleep(ms) {
+//   return new Promise((res) => {
+//     setTimeout(res, ms)
+//   })
+// }
+
+// async function scrollToBottom(page) {
+//   await page.evaluate(() => {})
+// }
+
+function getParsedListings(gqlRes) {
+  const tokenNodes = gqlRes.data.query.search.edges
+  const tokensInfo = tokenNodes.map(({ node }) => {
+    return {
+      tokenId: node.asset.name,
+      listPrice:
+        Number(
+          node.asset.orderData.bestAsk.paymentAssetQuantity.quantityInEth
+        ) / 1000000000000000000,
+    }
+  })
+  return tokensInfo
+}
+
+async function scrapeListings(collectionSlug) {
+  const url = `https://opensea.io/collection/${collectionSlug}`
+
+  const browser = await puppeteer.launch({
+    headless: false,
+  })
+
+  const page = await browser.newPage()
+
+  await page.goto(url)
+  await page.waitForTimeout(100)
+
+  const [buyNowBtn] = await page.$x("//button[contains(text(), 'Buy Now')]")
+  await buyNowBtn.click()
+
+  await page.waitForTimeout(500)
+
+  // response listener
+  page.on('response', async (response) => {
+    const request = response.request()
+    if (request.url().includes('graphql')) {
+      const tokens = getParsedListings(await response.json())
+      // if (tokens.length) bucket.push(...tokens)
+      console.log(tokens)
+    }
+  })
+
+  // await page.evaluate(async () => {
+  //   let scrollPosition = 0
+  //   let documentHeight = document.body.scrollHeight
+
+  //   while (documentHeight > scrollPosition) {
+  //     window.scrollBy(0, documentHeight)
+  //     scrollPosition = documentHeight
+  //     documentHeight = document.body.scrollHeight
+  //   }
+  // })
+  await page.evaluate(() => window.scrollBy(0, document.body.scrollHeight))
+
+  await browser.close()
+}
+
+app.get(`/`, async (req, res) => {
   res.json({ up: true })
 })
 
-app.get(`/api/seed`, async (req, res) => {
-  const seedUser = {
-    email: 'jane@prisma.io',
-    name: 'Jane',
-    posts: {
-      create: [
-        {
-          title:
-            'Comparing Database Types: How Database Types Evolved to Meet Different Needs',
-          content:
-            'https://www.prisma.io/blog/comparison-of-database-models-1iz9u29nwn37/',
-          published: true,
-        },
-        {
-          title: 'Analysing Sleep Patterns: The Quantified Self',
-          content: 'https://quantifiedself.com/get-started/',
-          published: true,
-        },
-      ],
-    },
-  }
-
-  try {
-    await prisma.post.deleteMany({
-      where: {
-        author: {
-          email: 'jane@prisma.io',
-        },
-      },
-    })
-    await prisma.user.deleteMany({
-      where: {
-        email: 'jane@prisma.io',
-      },
-    })
-
-    const result = await prisma.user.create({
-      data: seedUser,
-    })
-    res.json(result)
-  } catch (e) {
-    console.error(e)
-    res.sendStatus(500)
-  }
-})
-
-app.post(`/api/user`, async (req, res) => {
-  const result = await prisma.user.create({
-    data: {
-      ...req.body,
-    },
-  })
-  res.json(result)
-})
-
-app.post(`/api/post`, async (req, res) => {
-  const { title, content, authorEmail } = req.body
-  const result = await prisma.post.create({
-    data: {
-      title,
-      content,
-      published: false,
-      author: { connect: { email: authorEmail } },
-    },
-  })
-  res.json(result)
-})
-
-app.put('/api/publish/:id', async (req, res) => {
-  const { id } = req.params
-  const post = await prisma.post.update({
-    where: {
-      id: parseInt(id),
-    },
-    data: { published: true },
-  })
-  res.json(post)
-})
-
-app.delete(`/api/post/:id`, async (req, res) => {
-  const { id } = req.params
-  const post = await prisma.post.delete({
-    where: {
-      id: parseInt(id),
-    },
-  })
-  res.json(post)
-})
-
-app.get(`/api/post/:id`, async (req, res) => {
-  const { id } = req.params
-  const post = await prisma.post.findUnique({
-    where: {
-      id: parseInt(id),
-    },
-  })
-  res.json(post)
-})
-
-app.get('/api/feed', async (req, res) => {
-  const posts = await prisma.post.findMany({
-    where: { published: true },
-    include: { author: true },
-  })
-  res.json(posts)
-})
-
-app.get('/api/filterPosts', async (req, res) => {
-  const { searchString } = req.query
-  const draftPosts = await prisma.post.findMany({
-    where: {
-      OR: [
-        {
-          title: {
-            contains: searchString,
-          },
-        },
-        {
-          content: {
-            contains: searchString,
-          },
-        },
-      ],
-    },
-  })
-  res.json(draftPosts)
+app.get(`/scrapeAzuki`, async (req, res) => {
+  res.send('hello world!')
 })
 
 const PORT = process.env.PORT || 3000
-const server = app.listen(PORT, () =>
-  console.log(
-    `🚀 Server ready at: http://localhost:${PORT}\n⭐️ See sample requests: http://pris.ly/e/ts/rest-express#3-using-the-rest-api`,
-  ),
-)
+app.listen(PORT, () => {
+  scrapeListings('azuki')
+  console.log(`server running at port: ${PORT}`)
+})
+
+// WAIT FOR A CERTAIN RESPONSE
+// await page.waitForResponse((response) =>
+//   response.url().includes('graphql')
+// )
+// WAIT FOR TIMEOUT
+// await page.waitForTimeout(200)
+//DATABASE_URL="postgres://postgres:1234@localhost:5432"
