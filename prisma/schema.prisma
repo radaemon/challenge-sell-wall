@@ -8,13 +8,12 @@ datasource db {
 }
 
 model Collection {
-  address  String    @id @unique
-  name     String
+  slug     String    @id @unique
   listings Listing[]
 }
 
 model Listing {
-  tokenId           Int         @id
-  collectionAddress String
-  Collection        Collection? @relation(fields: [collectionAddress], references: [address])
+  tokenId    String     @id
+  listPrice  Float
+  collection Collection @relation(fields: [tokenId], references: [slug])
 }
