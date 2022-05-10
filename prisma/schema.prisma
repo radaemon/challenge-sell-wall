@@ -13,7 +13,8 @@ model Collection {
 }
 
 model Listing {
-  tokenId    String     @id
-  listPrice  Float
-  collection Collection @relation(fields: [tokenId], references: [slug])
+  tokenId    String     @id @unique
+  slug       String
+  listPrice  Float?
+  collection Collection @relation(fields: [slug], references: [slug])
 }

@@ -3,14 +3,27 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth')
 
 puppeteer.use(StealthPlugin())
 
+const options = {
+  headless: true,
+  ignoreHTTPSErrors: true,
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-sync',
+    '--ignore-certificate-errors',
+    '--lang=en-US,en;q=0.9',
+  ],
+  defaultViewport: { width: 1366, height: 768 },
+}
+
 function getParsedListings(gqlRes) {
   const tokenNodes = gqlRes.data.query.search.edges
   const tokensInfo = tokenNodes.map(({ node }) => {
     return {
       tokenId: node.asset.name,
       listPrice:
-        Number(node.asset.orderData.bestAsk.paymentAssetQuantity.quantityInEth) /
-        1000000000000000000,
+        Number(node?.asset.orderData.bestAsk?.paymentAssetQuantity.quantityInEth) /
+          1000000000000000000 || null,
     }
   })
   return tokensInfo
@@ -37,16 +50,12 @@ async function scrollIndefinitely(page) {
 
 async function scrapeCollection(collectionSlug) {
   const url = `https://opensea.io/collection/${collectionSlug}`
-  const browser = await puppeteer.launch({
-    headless: true,
-  })
+  const browser = await puppeteer.launch(options)
   const bucket = []
 
   const page = await browser.newPage()
 
-  await page.goto(url)
-  await page.setViewport({ width: 1280, height: 800 })
-  await page.waitForTimeout(1000)
+  await page.goto(url, { waitUntil: `networkidle2` })
 
   const [buyNowBtn] = await page.$x("//button[contains(text(), 'Buy Now')]")
   await buyNowBtn.click()
@@ -57,6 +66,7 @@ async function scrapeCollection(collectionSlug) {
     const request = response.request()
     if (request.url().includes('graphql')) {
       const tokens = getParsedListings(await response.json())
+      console.log('scrolling...')
       if (tokens.length) bucket.push(...tokens)
     }
   })
@@ -65,6 +75,7 @@ async function scrapeCollection(collectionSlug) {
 
   await browser.close()
 
+  console.log(bucket)
   return bucket
 }
 
