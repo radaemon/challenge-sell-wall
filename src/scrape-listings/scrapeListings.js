@@ -54,6 +54,11 @@ async function scrapeCollection(collectionSlug) {
   const bucket = []
 
   const page = await browser.newPage()
+  await page.waitForTimeout(3000)
+
+  await page.screenshot({
+    path: 'tutorialspoint.png',
+  })
 
   await page.goto(url, { waitUntil: `networkidle2` })
 
