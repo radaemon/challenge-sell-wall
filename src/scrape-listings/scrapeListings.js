@@ -1,23 +1,7 @@
 const puppeteer = require('puppeteer-extra')
 const StealthPlugin = require('puppeteer-extra-plugin-stealth')
-const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker')
 
-// Add adblocker plugin to block all ads and trackers (saves bandwidth)
 puppeteer.use(StealthPlugin())
-puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
-
-const options = {
-  headless: false,
-  ignoreHTTPSErrors: true,
-  args: [
-    '--no-sandbox',
-    '--disable-setuid-sandbox',
-    '--disable-sync',
-    '--ignore-certificate-errors',
-    '--lang=en-US,en;q=0.9',
-  ],
-  defaultViewport: { width: 2560, height: 1945 },
-}
 
 function getParsedListings(gqlRes) {
   const tokenNodes = gqlRes.data.query.search.edges
@@ -53,19 +37,19 @@ async function scrollIndefinitely(page) {
 
 async function scrapeCollection(collectionSlug) {
   const url = `https://opensea.io/collection/${collectionSlug}`
-  const browser = await puppeteer.launch(options)
+  const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox'] })
   const bucket = []
 
-  const page = await browser.newPage()
-  await page.waitForTimeout(3000)
-
+  const page = (await browser.pages())[0]
   await page.goto(url, { waitUntil: `networkidle2` })
 
-  await page.screenshot({
-    path: 'tutorialspoint.png',
-  })
+  // debugging purposes in production
+  // await page.screenshot({
+  //   path: 'tutorialspoint.png',
+  // })
 
   const [buyNowBtn] = await page.$x("//button[contains(text(), 'Buy Now')]")
+  if (!buyNowBtn) throw new Error('Could not find button.')
   await buyNowBtn.click()
 
   await page.waitForTimeout(500)
