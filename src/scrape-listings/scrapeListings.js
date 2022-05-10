@@ -13,7 +13,7 @@ const options = {
     '--ignore-certificate-errors',
     '--lang=en-US,en;q=0.9',
   ],
-  defaultViewport: { width: 1366, height: 768 },
+  defaultViewport: { width: 2560, height: 1945 },
 }
 
 function getParsedListings(gqlRes) {
@@ -56,11 +56,11 @@ async function scrapeCollection(collectionSlug) {
   const page = await browser.newPage()
   await page.waitForTimeout(3000)
 
+  await page.goto(url, { waitUntil: `networkidle2` })
+
   await page.screenshot({
     path: 'tutorialspoint.png',
   })
-
-  await page.goto(url, { waitUntil: `networkidle2` })
 
   const [buyNowBtn] = await page.$x("//button[contains(text(), 'Buy Now')]")
   await buyNowBtn.click()
